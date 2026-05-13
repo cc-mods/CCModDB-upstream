@@ -1,7 +1,7 @@
 import { expect, test, describe } from 'bun:test'
 import semver from 'semver'
 import crypto from 'crypto'
-import { download, streamToBuffer } from '../src/download'
+import { download } from '../src/download'
 import {
     type DatabaseInfo,
     type InstallMethodExternalTool,
@@ -318,12 +318,12 @@ async function testZip(modzip: InstallMethodZip) {
     ).toBeTrue()
 
     if (modzip.url) {
-        const hash = await getHash(modzip.url)
+        const buf = await download(modzip.url)
+        const hash = await getHash(buf)
         expect(modzip.hash.sha256.toLowerCase(), 'hash must match').toEqual(hash)
     }
 }
 
-async function getHash(url: string) {
-    const buf = await download(url)
+async function getHash(buf: Buffer) {
     return crypto.createHash('sha256').update(buf).digest('hex')
 }
