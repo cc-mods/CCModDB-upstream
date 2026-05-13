@@ -1,7 +1,7 @@
 import https from 'https'
 import http from 'http'
 import stream from 'stream'
-import * as cache from './cache'
+import * as downloadCache from './download-cache'
 
 /**
  *

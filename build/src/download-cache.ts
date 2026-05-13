@@ -1,37 +1,24 @@
 import fs from 'fs'
 import crypto from 'crypto'
+import { AsyncCache } from './async-cache'
 
 const cacheDir = './build/cache'
 
-const cache: Record<string, () => Promise<Buffer>> = {}
+const cache = new AsyncCache<string, Buffer>(write)
 
 await fs.promises.mkdir(cacheDir, { recursive: true })
 for (const path of await fs.promises.readdir(cacheDir)) {
     const tagHash = path.slice(0, -'.cache'.length)
-    cache[tagHash] = () => readFromDisk(tagHash)
+    cache.set(tagHash, () => readFromDisk(tagHash), true)
 }
 
 async function readFromDisk(tagHash: string): Promise<Buffer> {
-    // console.log('cache hit!', tagHash)
-    const readPromise = fs.promises.readFile(file(tagHash))
-    cache[tagHash] = () => {
-        // console.log('cache await hit!', tagHash)
-        return readPromise
-    }
-    return readPromise
+    return fs.promises.readFile(file(tagHash))
 }
 
 export async function get(tag: string, download: () => Promise<Buffer>): Promise<Buffer> {
     const tagHash = hash(tag)
-    if (cache[tagHash]) return cache[tagHash]()
-    // console.log('cache miss!', tagHash)
-
-    const downloadPromise = download()
-    cache[tagHash] = () => downloadPromise
-
-    const data = await downloadPromise
-    await write(tagHash, data)
-    return data
+    return cache.get(tagHash, download)
 }
 
 async function write(tagHash: string, data: Buffer) {
