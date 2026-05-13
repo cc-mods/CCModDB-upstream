@@ -2,6 +2,10 @@ import https from 'https'
 import http from 'http'
 import stream from 'stream'
 import * as downloadCache from './download-cache'
+import { AsyncCache } from './async-cache'
+
+type FollowReturn = { head: http.IncomingMessage; realUrl: string }
+const followCache = new AsyncCache<string, FollowReturn>()
 
 /**
  *
@@ -9,10 +13,10 @@ import * as downloadCache from './download-cache'
  * @returns path to file
  */
 export async function download(url: string): Promise<Buffer> {
-    const [head, realUrl] = await follow(url)
+    const { head, realUrl } = await followCached(url)
     const etag = getTag(head)
 
-    return cache.get(etag, () => actualDownload(realUrl))
+    return downloadCache.get(etag, () => actualDownload(realUrl))
 }
 async function actualDownload(url: string) {
     const resp = await body(url)
@@ -29,7 +33,11 @@ export function streamToBuffer(readable: stream.Readable): Promise<Buffer> {
     })
 }
 
-async function follow(url: string): Promise<[http.IncomingMessage, string]> {
+async function followCached(url: string): Promise<FollowReturn> {
+    return followCache.get(url, () => follow(url))
+}
+
+async function follow(url: string): Promise<FollowReturn> {
     let result = await head(url)
     while (result.statusCode === 302 || result.statusCode === 301) {
         url = result.headers.location!
@@ -37,7 +45,7 @@ async function follow(url: string): Promise<[http.IncomingMessage, string]> {
         result = await head(url)
     }
     result.destroy()
-    return [result, url]
+    return { head: result, realUrl: url }
 }
 
 function head(url: string): Promise<http.IncomingMessage> {
