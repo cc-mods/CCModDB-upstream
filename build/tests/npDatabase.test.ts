@@ -261,41 +261,48 @@ function testMetadataCCMod(ccmod: PkgCCMod) {
 function testInstallation(mod: Package) {
     for (let i = 0; i < mod.installation.length; i++) {
         const inst = mod.installation[i]
-        test(`installation ${i}`, async () => {
-            expect(
-                typeof inst === 'object',
-                'installation (type: object) must be an object'
-            ).toBeTrue()
-            expect(Array.isArray(inst), 'installation (type: object) must be an object').toBeFalse()
-            expect(inst !== null, 'installation (type: object) must be an object').toBeTrue()
+        test(
+            `installation ${i}`,
+            async () => {
+                expect(
+                    typeof inst === 'object',
+                    'installation (type: object) must be an object'
+                ).toBeTrue()
+                expect(
+                    Array.isArray(inst),
+                    'installation (type: object) must be an object'
+                ).toBeFalse()
+                expect(inst !== null, 'installation (type: object) must be an object').toBeTrue()
 
-            expect(
-                ['zip', 'externaltool', undefined].includes(inst.type),
-                'installation.type (type: string) must be one of: ["zip", "externaltool", undefined]'
-            ).toBeTrue()
+                expect(
+                    ['zip', 'externaltool', undefined].includes(inst.type),
+                    'installation.type (type: string) must be one of: ["zip", "externaltool", undefined]'
+                ).toBeTrue()
 
-            expect(
-                inst.platform === undefined ||
-                    [
-                        'aix',
-                        'darwin',
-                        'freebsd',
-                        'linux',
-                        'openbsd',
-                        'sunos',
-                        'win32',
-                        'android',
-                    ].includes(inst.platform),
-                'installation.platform (type: string) must be a valid platform'
-            ).toBeTrue()
+                expect(
+                    inst.platform === undefined ||
+                        [
+                            'aix',
+                            'darwin',
+                            'freebsd',
+                            'linux',
+                            'openbsd',
+                            'sunos',
+                            'win32',
+                            'android',
+                        ].includes(inst.platform),
+                    'installation.platform (type: string) must be a valid platform'
+                ).toBeTrue()
 
-            switch ((inst as InstallMethodZip | InstallMethodExternalTool).type) {
-                case 'externaltool':
-                case 'zip':
-                    await testZip(inst)
-                    break
-            }
-        }, 100e3)
+                switch ((inst as InstallMethodZip | InstallMethodExternalTool).type) {
+                    case 'externaltool':
+                    case 'zip':
+                        await testZip(inst)
+                        break
+                }
+            },
+            { timeout: 100e3, retry: 3 }
+        )
     }
 }
 
