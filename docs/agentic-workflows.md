@@ -28,11 +28,15 @@ resolves threads. The agent job is read-only; every write goes through gh-aw `sa
    must allow Copilot coding-agent / agentic workflows. (To use Anthropic/OpenAI/Gemini instead,
    change `engine:` and add the matching secret, e.g. `ANTHROPIC_API_KEY`.)
 2. **Compile to a lock file.** GitHub Actions runs the compiled `upstream-sync.lock.yml`, not the
-   `.md`. This repo compiles it automatically in CI via `.github/workflows/compile-aw.yml` (installs
-   the gh-aw CLI with the official script, runs `gh aw compile`, commits the lock file). Or, if you
-   have the CLI locally: `gh extension install github/gh-aw && gh aw compile`.
+   `.md`. This repo's `.github/workflows/compile-aw.yml` installs the gh-aw CLI and runs
+   `gh aw compile` on every change to a workflow `.md`, then **uploads the lock file as a build
+   artifact** (`agentic-lock-files`). A maintainer downloads it and commits it — CI does not push
+   workflow files itself, because the default `GITHUB_TOKEN` can't create/update files under
+   `.github/workflows/` (that needs the `workflows` permission, which isn't grantable to the Actions
+   token). With the CLI locally you can skip the artifact dance: `gh extension install github/gh-aw
+   && gh aw compile && git add .github/workflows/*.lock.yml`.
 3. **Review the generated `.lock.yml`** before trusting a run: check the pinned action SHAs, the
-   secrets listed in its header, and that the agent permissions are read-only.
+   secrets listed in its `gh-aw-manifest` header, and that the agent permissions are read-only.
 
 > The CLI binary is gated by SAML on the `github` org, so it may not install on every machine. That's
 > why compilation is wired into CI — you never strictly need the local CLI here.
