@@ -1,0 +1,59 @@
+# Compile the gh-aw agentic workflow (.md) into its runnable .lock.yml.
+#
+# WHY: the agentic workflow source is `upstream-sync.md`, but GitHub Actions runs the COMPILED
+# `upstream-sync.lock.yml`. gh-aw normally compiles locally via the `gh aw` CLI extension. This CI
+# job does it on GitHub instead, so the lock file stays in sync with the .md without anyone needing
+# the CLI installed (handy when the CLI binary is gated, e.g. SAML on the github org).
+#
+# It installs the gh-aw extension with the official install script, runs `gh aw compile`, and commits
+# the regenerated lock file if it changed. Compiling does NOT require any engine secret — but RUNNING
+# the agentic workflow does (see docs/agentic-workflows.md).
+name: Compile agentic workflows
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/*.md'
+      - '.github/workflows/compile-aw.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: compile-aw
+  cancel-in-progress: true
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install gh-aw CLI extension
+        run: |
+          set -euo pipefail
+          curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash
+          gh aw version
+
+      - name: Compile agentic workflows
+        run: |
+          set -euo pipefail
+          gh aw compile
+
+      - name: Commit regenerated lock files (if any changed)
+        run: |
+          set -euo pipefail
+          if [ -z "$(git status --porcelain -- '.github/workflows/*.lock.yml')" ]; then
+            echo "lock files already up to date."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/*.lock.yml
+          git commit -m "chore: recompile agentic workflows [skip ci]"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

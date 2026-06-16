@@ -1,0 +1,74 @@
+# Keep this fork (cc-mods/CCModDB-upstream) current with upstream CCDirectLink/CCModDB.
+#
+# WHY: this fork is the cc-mods org's tracked MIRROR of the official CrossCode mod database. We
+# never submit PRs upstream; we just mirror it so the official catalog is always available inside
+# the org (and so clients that dual-register our DB + official always have a fresh source).
+#
+# WHAT: on a schedule (and on demand) fast-forward our branches from upstream using GitHub's
+# native "merge upstream" API (`gh repo sync`). A pure mirror fast-forwards cleanly; if a branch
+# has diverged (it shouldn't — we don't commit to mirror branches) the sync is skipped and an
+# issue is opened so a human/agent can look. This is the deterministic SAFETY NET that guarantees
+# "when upstream updates, our tracked fork updates too" with no AI, no secrets, no external deps.
+#
+# The agentic review layer (upstream-sync.md) is OPTIONAL and sits on top of this — see
+# docs/agentic-workflows.md.
+name: Sync fork from upstream
+
+on:
+  schedule:
+    # Every 6 hours (minute 17 to avoid the top-of-hour stampede).
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      UPSTREAM: CCDirectLink/CCModDB
+    steps:
+      - name: Sync mirror branches from upstream
+        run: |
+          set -uo pipefail
+          # Mirror the branches CCModManager and the build pipeline actually use.
+          BRANCHES="master stable testing"
+          failed=""
+          for b in $BRANCHES; do
+            echo "::group::sync $b"
+            # `gh repo sync` calls the merge-upstream API: fast-forwards origin/$b to upstream/$b.
+            if gh repo sync "${GITHUB_REPOSITORY}" --branch "$b" --source "$UPSTREAM" 2>&1; then
+              echo "synced $b"
+            else
+              echo "could not fast-forward $b (diverged or missing upstream branch)"
+              failed="$failed $b"
+            fi
+            echo "::endgroup::"
+          done
+          echo "FAILED_BRANCHES=$(echo $failed | xargs)" >> "$GITHUB_ENV"
+
+      - name: Open an issue if any branch could not be synced
+        if: env.FAILED_BRANCHES != ''
+        run: |
+          set -euo pipefail
+          title="upstream sync: branches not fast-forwardable ($FAILED_BRANCHES)"
+          # De-dupe: don't pile up identical open issues.
+          existing="$(gh issue list --state open --search "in:title upstream sync: branches not fast-forwardable" --json number --jq '.[0].number' || true)"
+          {
+            printf 'The scheduled mirror sync could not fast-forward: **%s**\n\n' "$FAILED_BRANCHES"
+            printf 'This usually means a mirror branch diverged from `%s` (we should never commit to mirror branches), or the branch no longer exists upstream. Resolve by resetting the branch to upstream, or adjust the branch list in `.github/workflows/sync-upstream.yml`.\n\n' "$UPSTREAM"
+            printf '(opened automatically by the Sync fork from upstream workflow)\n'
+          } > /tmp/sync-issue-body.md
+          if [ -n "$existing" ]; then
+            echo "issue #$existing already open; adding a note"
+            gh issue comment "$existing" --body "Still failing on a later run: **$FAILED_BRANCHES** ($(date -u +%FT%TZ))."
+          else
+            gh issue create --title "$title" --body-file /tmp/sync-issue-body.md --label automation || true
+          fi

@@ -1,0 +1,3 @@
+# gh-aw: compiled agentic-workflow lock files are generated artifacts.
+# Mark them so diffs/reviews collapse them, but DO keep them committed (never gitignore).
+.github/workflows/*.lock.yml linguist-generated=true -diff
