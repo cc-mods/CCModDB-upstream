@@ -5,7 +5,7 @@ This repo is the **cc-mods organization's tracked mirror** of the official Cross
 is always available inside the org and stays fresh for clients that dual-register our database
 alongside the official one.
 
-📓 **Knowledge base:** [`cc-mods/knowledge`](https://github.com/cc-mods/knowledge) (private) is the
+📓 **Knowledge base:** [`cc-mods/cc-agent-tools`](https://github.com/cc-mods/cc-agent-tools) (private) is the
 source of truth for the suite — start with `ccmoddb-and-distribution.md` and `suite-architecture.md`.
 
 ## 🚨 Golden rule

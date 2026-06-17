@@ -3,7 +3,7 @@
 **Read [`AGENTS.md`](../AGENTS.md) first** — it's the source of truth for what this repo is and the
 one golden rule (never write to the official upstream).
 
-📓 Suite knowledge base: [`cc-mods/knowledge`](https://github.com/cc-mods/knowledge) (private).
+📓 Suite knowledge base: [`cc-mods/cc-agent-tools`](https://github.com/cc-mods/cc-agent-tools) (private).
 For agentic-workflow authoring, follow
 [`.github/instructions/agentic-workflows.instructions.md`](instructions/agentic-workflows.instructions.md)
 (mirrored from `github/gh-aw`).
