@@ -3,7 +3,7 @@
 ## input-locations.json
 
 `input-locations.json` specifies the source of mod archives for creating the database.  
-It's a JSON file containing a JSON array.  
+It's a JSON file containing an JSON record with the key being the mod id and the value being the `InputLocation` object.  
 The TypeScript types for this file are under [`build/src/types.ts`](/build/src/types.ts) `InputLocations`.  
 
 ### Example entries
@@ -11,13 +11,13 @@ The TypeScript types for this file are under [`build/src/types.ts`](/build/src/t
 An example `zip` mod entry would be:
 
 ```json
-    { "url": "https://github.com/CCDirectLink/input-api/archive/refs/tags/v1.0.2.zip" }
+    "input-api": { "url": "https://github.com/CCDirectLink/input-api/archive/refs/tags/v1.0.2.zip" }
 ```
 
 And an example `ccmod` entry would be:
 
 ```json
-    { "url": "https://github.com/krypciak/cc-fancy-crash/releases/download/v1.1.0/cc-fancy-crash-1.1.0.ccmod" }
+    "cc-fancy-crash": { "url": "https://github.com/krypciak/cc-fancy-crash/releases/download/v1.1.0/cc-fancy-crash-1.1.0.ccmod" }
 ```
 
 ## npDatabase.json
@@ -43,7 +43,7 @@ Modifying the database manually is sometimes required, for example when removing
    - In the case of `stable`, run `export BRANCH=stable`  
 3. Switch to the branch you choose with.  
    To do that, run `git checkout $BRANCH`
-4. Add your mod to the `input-locations.json` file. For specific details, see [DATABASE.md](/docs/DATABASE.md)
+4. Add your mod to the `input-locations.json` file.
 5. Commit the changes
 6. Switch back to the `master` branch.  
    To do that, run `git checkout master`
@@ -51,9 +51,10 @@ Modifying the database manually is sometimes required, for example when removing
 	- Run `bun ci`  
 	- Now you have two choices:
 	  - If you just want to have the entry you just changed updated, run:  
-	    `bun run start`    
+	    `bun run start 'my-mod-id'`    
+       Replace `my-mod-id` with your mod id (it is a comma seperated list)
 	  - If you want to re-generate the entire database from scratch, run:  
-	    `bun run startScratch`  
+	    `bun run start scratch`  
 8. If successful, you should be checked-out on the selected branch
 10. Amend the last commit to also include the current changes
 11. Switch back to the `master` branch

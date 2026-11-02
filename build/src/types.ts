@@ -8,10 +8,8 @@ export type ZipInputLocation = {
         Note that GitHub archives have an additional enclosing directory, so you will usually need to use this.
         Only this subdirectory & subdirectories of it are extracted, and it is extracted at the target installation directory. */
     source?: string
-    /** If provided, then the package.json file is at this location in the archive, regardless of 'source'.
+    /** If provided, then the ccmod.json file is at this location in the archive, regardless of 'source'.
         This must pretty much only be used for base packages. */
-    packageJSONPath?: string
-    /** the same as packageJSONPath but for ccmod.json */
     ccmodPath?: string
 }
 
@@ -22,7 +20,7 @@ export type ExternalToolInputLocation = {
 }
 
 /** The content of the input-locations.json file. */
-export type InputLocations = InputLocation[]
+export type InputLocations = Record<string, InputLocation>
 
 /** An os.platform() value (see https://nodejs.org/api/os.html#os_os_platform ) */
 export type NodeOSPlatform = NodeJS.Platform
@@ -98,7 +96,6 @@ type Person = /* PersonDetails | */ string
 /**     comment?: LocalizedString */
 /** } */
 
-
 /**
  * Mod tags that are in the ccmod.json standard
  **/
@@ -126,13 +123,13 @@ export const ValidTags = [
     'dev',
     'library',
     'base',
-    'externaltool'
+    'externaltool',
 ] as const
 
 /**
  * Mod tags that are in the ccmod.json standard
  **/
-export type ValidTags = typeof ValidTags[number]
+export type ValidTags = (typeof ValidTags)[number]
 
 /**
  * All mods in the database must have these fields
@@ -196,8 +193,8 @@ export type InstallMethod = InstallMethodZip
 
 export type InstallMethodBase = {
     /** The URL of the file to download.
-     *  (example: "https://github.com/CCDirectLink/CCLoader/archive/master.zip") 
-     *  (example: "https://github.com/CCDirectLink/CC-ChargedBalls/releases/download/1.0.0/ChargedBalls.ccmod") 
+     *  (example: "https://github.com/CCDirectLink/CCLoader/archive/master.zip")
+     *  (example: "https://github.com/CCDirectLink/CC-ChargedBalls/releases/download/1.0.0/ChargedBalls.ccmod")
      **/
     url: string
     /** The hash of the file at url. */
@@ -227,7 +224,7 @@ export type InstallMethodExternalTool = InstallMethodBase & {
 export interface ReleasePage {
     /** Body of the release in Markdown */
     body: string
-    /** The tag name. There is an attempt to convert it to a proper semver, but if it fails it 
+    /** The tag name. There is an attempt to convert it to a proper semver, but if it fails it
      * is just the raw tag name */
     version: string
     /** UNIX timestamp of the release */

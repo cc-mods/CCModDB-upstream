@@ -11,7 +11,7 @@ import type {
     ZipInputLocation,
 } from './types'
 import { getRepositoryEntry } from './api'
-import type { WriteFunc } from './main'
+import type { WriteFunc } from './fs-util'
 import * as semver from 'semver'
 
 export type ModMetadatas = {
@@ -77,8 +77,6 @@ async function getModZipFile<T>(
 }
 
 function modZipPath(zip: ZipInputLocation, fileName: string): string {
-    if (fileName === 'package.json' && zip.packageJSONPath) return zip.packageJSONPath
-
     if (fileName === 'ccmod.json' && zip.ccmodPath) return zip.ccmodPath
 
     if (zip.source) {

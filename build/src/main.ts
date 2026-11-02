@@ -1,13 +1,11 @@
 import * as source from './source'
 import * as db from './db'
-import type { InputLocations, PackageDB } from './types'
+import type { InputLocation, PackageDB } from './types'
 
 import * as fs from 'fs'
 import * as path from 'path'
 import { getRepoBranches, git, gitReadFunc } from './git'
-
-export type ReadFunc = (path: string) => Promise<string | undefined>
-export type WriteFunc = (path: string, data: Buffer | string) => Promise<void>
+import { readPackageDb, readInputLocations, type ReadFunc, type WriteFunc } from './fs-util'
 
 async function main() {
     const GITHUB_TOKEN = process.env['GITHUB_TOKEN']
@@ -20,10 +18,8 @@ async function main() {
 
     const branch: string = process.argv[2]
 
-    let type: 'scratch' | undefined = process.argv[3] as any
-    if (type != 'scratch' && type !== undefined) {
-        throw new Error(`Invalid second arguemnt: "${type}"\n`)
-    }
+    const isFromScratch = process.argv[3] == 'scratch'
+    const changedModIds = process.argv[3]?.split(',') ?? []
 
     const repoBranches = await getRepoBranches()
     if (!repoBranches.includes(branch)) {
@@ -37,7 +33,8 @@ async function main() {
     }
 
     await createNpDatabase(
-        type == 'scratch',
+        isFromScratch,
+        changedModIds,
         (path: string) => gitReadFunc(branch, path),
         gitWriteFunc
     )
@@ -53,109 +50,49 @@ async function main() {
     )
 }
 
-async function readInputLocations(
-    read: ReadFunc
-): Promise<{ locations: InputLocations; raw: string }> {
-    const path = 'input-locations.json'
-    const data = await read(path)
-    if (!data) throw new Error(`input-locations.json doesn't exist on the target branch!`)
-    return { locations: JSON.parse(data), raw: data }
-}
-async function readOldInputLocations(read: ReadFunc): Promise<InputLocations | undefined> {
-    const path = 'input-locations.old.json'
-    const data = await read(path)
-    if (!data) return undefined
-    return JSON.parse(data)
-}
-
-function getInputLocationsDiff(
-    newl: InputLocations,
-    oldl: InputLocations
-): { toFetch: InputLocations; urlsToRemove: string[] } {
-    const diffl: InputLocations = []
-    const urls: Set<string> = new Set(oldl.map(e => e.url))
-    const urlsToRemove: Set<string> = new Set([...urls])
-
-    for (let i = 0; i < newl.length; i++) {
-        const newE = newl[i]
-        if (!urls.has(newE.url)) {
-            diffl.push(newE)
-        } else {
-            urlsToRemove.delete(newE.url)
-        }
-    }
-    return { toFetch: diffl, urlsToRemove: [...urlsToRemove] }
-}
-
-async function getPackageDb(read: ReadFunc): Promise<PackageDB | undefined> {
-    const data = await read('npDatabase.json')
-    if (!data) return undefined
-    return JSON.parse(data)
-}
-
-function databaseToUrlRecord(db: PackageDB): Record<string, string[]> {
-    const urlToDbKey: Record<string, string[]> = {}
-    for (const dbKey in db) {
-        const entry = db[dbKey]
-        for (const { url } of entry.installation) {
-            urlToDbKey[url] ??= []
-            urlToDbKey[url].push(dbKey)
-        }
-    }
-    return urlToDbKey
-}
-
-async function createNpDatabase(fromScratch: boolean, read: ReadFunc, write: WriteFunc) {
-    const { locations, raw: locationsStr } = await readInputLocations(read)
+async function createNpDatabase(
+    fromScratch: boolean,
+    changedModIds: string[],
+    read: ReadFunc,
+    write: WriteFunc
+) {
+    const locations = await readInputLocations(read)
 
     let dbToMerge: PackageDB = {}
-    let inputLocationsToFetch: InputLocations = []
+    let inputLocationsToFetch: InputLocation[] = []
 
-    nonFromScratchIf: if (!fromScratch) {
-        const oldLocations = await readOldInputLocations(read)
-        if (!oldLocations) {
-            fromScratch = true
-            break nonFromScratchIf
-        }
-        const oldDb = await getPackageDb(read)
-        if (!oldDb) {
-            fromScratch = true
-            break nonFromScratchIf
-        }
-
-        const { toFetch, urlsToRemove } = getInputLocationsDiff(locations, oldLocations)
-
-        inputLocationsToFetch = toFetch
+    const oldDb = await readPackageDb(read)
+    if (oldDb) {
         dbToMerge = oldDb
-
-        const urlToDbKey = databaseToUrlRecord(dbToMerge)
-        for (const url of urlsToRemove) {
-            for (const key of urlToDbKey[url] ??
-                [] /* <- this only happens when input-locations.old.json gets changed as a part of a ccbot commit*/) {
-                delete dbToMerge[key]
-            }
-        }
+    } else {
+        fromScratch = true
     }
 
     if (fromScratch) {
-        inputLocationsToFetch = locations
+        inputLocationsToFetch = Object.values(locations)
+    } else {
+        for (const modId of changedModIds) {
+            const loc = locations[modId]
+            if (!loc) throw new Error(`mod: "${modId}" not found in input-locations.json`)
+            inputLocationsToFetch.push(loc)
+        }
+        for (const modId in oldDb) {
+            if (!locations[modId]) delete oldDb[modId]
+        }
     }
-    const promises: Promise<source.ModMetadatasInput>[] = []
-    for (const loc of inputLocationsToFetch) {
-        promises.push(source.get(loc, write))
+    if (inputLocationsToFetch.length == 0) {
+        console.log('no input locations specified')
+        process.exit(1)
     }
-    const packages = await Promise.all(promises)
+
+    const packages = await Promise.all(inputLocationsToFetch.map(loc => source.get(loc, write)))
 
     const pkgDb = await db.build(packages)
 
     const mergedDb = db.sort(Object.assign(dbToMerge, pkgDb))
-    await Promise.all([
-        db.write(mergedDb, write),
-        db.writeMinified(mergedDb, write),
-        write('input-locations.old.json', locationsStr),
-    ])
+    await Promise.all([db.write(mergedDb, write), db.writeMinified(mergedDb, write)])
 
     console.log(JSON.stringify(pkgDb, null, 4))
 }
 
-main().catch(err => console.error('error: ', err))
+main()
